@@ -1,0 +1,9 @@
+flask>=3.0.0
+flask-session
+pandas
+openpyxl
+python-pptx
+matplotlib
+google-genai
+comtypes; sys_platform == "win32"
+werkzeug

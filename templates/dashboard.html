@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — Report Automation</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #0f172a; }
+    .navbar { background: #0f172a; }
+    .stepper { display: flex; justify-content: space-between; position: relative; margin-bottom: 2rem; }
+    .stepper::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 3px; background: #e2e8f0; z-index: 1; transform: translateY(-50%); }
+    .step-item { position: relative; z-index: 2; background: #f8fafc; padding: 0 10px; text-align: center; }
+    .step-icon { width: 42px; height: 42px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; margin-bottom: 6px; transition: all 0.3s; }
+    .step-item.active .step-icon { background: #0ea5e9; color: #fff; box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2); }
+    .step-item.completed .step-icon { background: #22c55e; color: #fff; }
+    .card { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 3rem 2rem; text-align: center; background: #fff; cursor: pointer; transition: all 0.2s; }
+    .upload-zone:hover { border-color: #0ea5e9; background: #f0f9ff; }
+    .log-terminal { background: #0f172a; color: #38bdf8; font-family: monospace; font-size: 13px; padding: 1rem; border-radius: 8px; height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+  <div class="container">
+    <a class="navbar-brand font-weight-bold" href="#">
+      <i class="bi bi-bar-chart-fill text-info me-2"></i> Report Automation Web
+    </a>
+    <div class="d-flex align-items-center text-light">
+      <span class="me-3"><i class="bi bi-person-circle me-1"></i> {{ username }}</span>
+      <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right"></i> Logout</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container mb-5">
+  <!-- Stepper Header -->
+  <div class="stepper">
+    <div class="step-item active" id="step1-indicator">
+      <div class="step-icon"><i class="bi bi-upload"></i></div>
+      <div class="small font-weight-bold">1. Upload Data</div>
+    </div>
+    <div class="step-item" id="step2-indicator">
+      <div class="step-icon"><i class="bi bi-gear-wide-connected"></i></div>
+      <div class="small font-weight-bold">2. Generate Report</div>
+    </div>
+    <div class="step-item" id="step3-indicator">
+      <div class="step-icon"><i class="bi bi-download"></i></div>
+      <div class="small font-weight-bold">3. Download / Email</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-12">
+
+      <!-- STEP 1: UPLOAD DATA -->
+      <div class="card mb-4" id="step1-card">
+        <div class="card-header bg-white font-weight-bold py-3">
+          <i class="bi bi-cloud-arrow-up text-primary me-2"></i> Step 1: Upload Data
+        </div>
+        <div class="card-body">
+          <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="pills-file-tab" data-bs-toggle="pill" data-bs-target="#pills-file" type="button"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Upload File CSV</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="pills-url-tab" data-bs-toggle="pill" data-bs-target="#pills-url" type="button"><i class="bi bi-github me-1"></i> URL Github</button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="pills-tabContent">
+            <!-- Upload File -->
+            <div class="tab-pane fade show active" id="pills-file">
+              <form id="upload-file-form">
+                <div class="upload-zone" onclick="document.getElementById('csv_file').click()">
+                  <i class="bi bi-file-earmark-arrow-up display-4 text-secondary mb-2"></i>
+                  <h6 class="font-weight-bold">Klik atau drag & drop file CSV di sini</h6>
+                  <p class="text-muted small mb-0">Format yang didukung: .csv (Maks 50MB)</p>
+                  <input type="file" id="csv_file" name="csv_file" accept=".csv" class="d-none" onchange="submitUploadFile()">
+                </div>
+              </form>
+            </div>
+
+            <!-- Upload URL -->
+            <div class="tab-pane fade" id="pills-url">
+              <form id="upload-url-form" onsubmit="submitUploadUrl(event)">
+                <div class="mb-3">
+                  <label class="form-label font-weight-bold">Link Repository/Raw CSV Github</label>
+                  <input type="url" class="form-control" id="github_url" placeholder="https://github.com/nurchamid/ReportAutomation/blob/main/Car_Sales_OLTP_SLStyle_18Months.csv" required>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-download me-1"></i> Muat Data dari URL</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Preview Container -->
+          <div id="upload-preview" class="mt-4 d-none">
+            <div class="alert alert-success d-flex align-items-center">
+              <i class="bi bi-check-circle-fill me-2 fs-5"></i> Data berhasil dimuat & diproses!
+            </div>
+            <div class="row">
+              <div class="col-md-3">
+                <div class="p-3 bg-light rounded text-center">
+                  <div class="text-muted small">Total Baris</div>
+                  <div class="fs-4 font-weight-bold text-dark" id="preview-rows">-</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 bg-light rounded text-center">
+                  <div class="text-muted small">Total Kolom</div>
+                  <div class="fs-4 font-weight-bold text-dark" id="preview-cols">-</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                  <div class="text-muted small">Periode Tanggal</div>
+                  <div class="fs-6 font-weight-bold text-dark" id="preview-date">-</div>
+                </div>
+              </div>
+            </div>
+            <div class="text-end mt-3">
+              <button class="btn btn-success" onclick="goToStep(2)"><i class="bi bi-arrow-right-circle me-1"></i> Lanjut ke Step 2 (Generate)</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- STEP 2: GENERATE REPORT -->
+      <div class="card mb-4" id="step2-card">
+        <div class="card-header bg-white font-weight-bold py-3">
+          <i class="bi bi-gear-wide-connected text-primary me-2"></i> Step 2: Konfigurasi & Generate Slide Report
+        </div>
+        <div class="card-body">
+          <form id="generate-form" onsubmit="submitGenerate(event)">
+            <label class="form-label font-weight-bold mb-3">Pilih Layout Slide yang Ingin Dihasilkan:</label>
+            
+            <div class="row g-3 mb-4">
+              <!-- 1. Pojok Kiri Atas (Recommended) -->
+              <div class="col-md-6">
+                <div class="form-check card h-100 p-3 border-primary shadow-sm position-relative">
+                  <span class="badge bg-primary position-absolute top-0 end-0 m-2">Rekomendasi</span>
+                  <input class="form-check-input" type="radio" name="slide_option" id="opt1" value="1" checked onchange="toggleGeminiKey()">
+                  <label class="form-check-label w-100 ms-2" for="opt1">
+                    <strong class="d-block text-primary">1. AI Executive Summary (Generated by AI)</strong>
+                    <span class="text-muted small">Insight naratif otomatis dari AI Gemini & Trend Line Chart.</span>
+                  </label>
+                </div>
+              </div>
+              <!-- 2. Pojok Kanan Atas -->
+              <div class="col-md-6">
+                <div class="form-check card h-100 p-3">
+                  <input class="form-check-input" type="radio" name="slide_option" id="opt2" value="2" onchange="toggleGeminiKey()">
+                  <label class="form-check-label w-100 ms-2" for="opt2">
+                    <strong class="d-block">2. Tabel Performa Executive (Slide KPI Standar)</strong>
+                    <span class="text-muted small">Slide tabel ringkasan 6 Key Performance Metrics utama.</span>
+                  </label>
+                </div>
+              </div>
+              <!-- 3. Pojok Kiri Bawah -->
+              <div class="col-md-6">
+                <div class="form-check card h-100 p-3">
+                  <input class="form-check-input" type="radio" name="slide_option" id="opt3" value="3" onchange="toggleGeminiKey()">
+                  <label class="form-check-label w-100 ms-2" for="opt3">
+                    <strong class="d-block">3. Visual Dashboard (Power BI Style)</strong>
+                    <span class="text-muted small">Slide visual lengkap dengan KPI Cards, Line Chart, Column Charts, Doughnut & Pie Chart.</span>
+                  </label>
+                </div>
+              </div>
+              <!-- 4. Pojok Kanan Bawah -->
+              <div class="col-md-6">
+                <div class="form-check card h-100 p-3">
+                  <input class="form-check-input" type="radio" name="slide_option" id="opt4" value="4" onchange="toggleGeminiKey()">
+                  <label class="form-check-label w-100 ms-2" for="opt4">
+                    <strong class="d-block">4. Slide Lengkap (Semua Layout 1-3)</strong>
+                    <span class="text-muted small">Menghasilkan 3 jenis slide sekaligus ke dalam 1 berkas presentasi.</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Gemini API Key -->
+            <div class="mb-4 d-none" id="gemini-key-container">
+              <label class="form-label font-weight-bold">Gemini API Key</label>
+              <input type="password" class="form-control" id="gemini_api_key" name="gemini_api_key" placeholder="Masukkan Gemini API Key Anda">
+              <div class="form-text">Dibutuhkan untuk Opsi 1 & 4.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100" id="btn-generate">
+              <i class="bi bi-play-circle me-1"></i> Generate PPTX & PDF Report
+            </button>
+          </form>
+
+          <!-- Terminal Log SSE -->
+          <div class="mt-4 d-none" id="generate-log-container">
+            <label class="form-label font-weight-bold text-secondary">Proses Log Generation:</label>
+            <div class="log-terminal" id="log-terminal"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: DOWNLOAD & EMAIL -->
+      <div class="card mb-4" id="step3-card">
+        <div class="card-header bg-white font-weight-bold py-3">
+          <i class="bi bi-download text-primary me-2"></i> Step 3: Download Report & Kirim Email
+        </div>
+        <div class="card-body">
+          <div class="row mb-4">
+            <div class="col-md-6 mb-2">
+              <a href="/download/pptx" class="btn btn-outline-success btn-lg w-100">
+                <i class="bi bi-file-earmark-slides me-2"></i> Download Presentasi (.PPTX)
+              </a>
+            </div>
+            <div class="col-md-6 mb-2">
+              <a href="/download/pdf" class="btn btn-outline-danger btn-lg w-100">
+                <i class="bi bi-file-earmark-pdf me-2"></i> Download Dokumen (.PDF)
+              </a>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <h5 class="font-weight-bold mb-3"><i class="bi bi-envelope-at text-primary me-2"></i> Kirim Laporan via Email</h5>
+
+          <form id="email-form" onsubmit="submitSendEmail(event)">
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label font-weight-bold">Email Pengirim (Gmail)</label>
+                <input type="email" class="form-control" id="sender_email" required placeholder="contoh@gmail.com">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label font-weight-bold">App Password Gmail</label>
+                <input type="password" class="form-control" id="sender_password" required placeholder="xxxx xxxx xxxx xxxx">
+              </div>
+            </div>
+
+            <div class="mb-3 p-3 bg-light rounded border">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <label class="form-label font-weight-bold mb-0">Daftar Penerima Branch & Email:</label>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="collapse" data-bs-target="#manualInputCollapse">
+                    <i class="bi bi-plus-circle me-1"></i> Tambah Manual Branch & Email
+                  </button>
+                  <a href="/download-email-template" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Download Template Excel
+                  </a>
+                  <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('custom_excel_file').click()">
+                    <i class="bi bi-upload me-1"></i> Upload List Excel kustom
+                  </button>
+                  <input type="file" id="custom_excel_file" accept=".xlsx, .xls" class="d-none" onchange="submitUploadCustomEmailExcel(this)">
+                </div>
+              </div>
+
+              <!-- Form Input Manual (Collapsible) -->
+              <div class="collapse mb-3" id="manualInputCollapse">
+                <div class="card card-body bg-white border-primary">
+                  <h6 class="font-weight-bold text-primary mb-2"><i class="bi bi-pencil-square me-1"></i> Input Manual Branch & Email Penerima</h6>
+                  <p class="text-muted small mb-3">Isi <strong>ALL</strong> pada nama branch jika laporan tidak perlu dibreakdown per cabang (menggunakan seluruh data).</p>
+                  <div class="row g-2">
+                    <div class="col-md-5">
+                      <input type="text" class="form-control form-control-sm" id="manual_branch_name" placeholder="Nama Branch (contoh: Colombo Auto Hub / ALL)">
+                    </div>
+                    <div class="col-md-5">
+                      <input type="text" class="form-control form-control-sm" id="manual_emails" placeholder="Email penerima (pisahkan dengan semicolon ';')">
+                    </div>
+                    <div class="col-md-2">
+                      <button type="button" class="btn btn-sm btn-primary w-100" onclick="addManualBranchEmail()">
+                        <i class="bi bi-plus-lg me-1"></i> Tambahkan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="table-responsive border rounded" style="max-height: 250px; background: #fff;">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light sticky-top">
+                    <tr>
+                      <th width="40"><input type="checkbox" id="check-all" onchange="toggleCheckAll(this)"></th>
+                      <th>Nama Cabang (Branch)</th>
+                      <th>Daftar Email Penerima</th>
+                    </tr>
+                  </thead>
+                  <tbody id="email-table-body">
+                    <tr><td colspan="3" class="text-center text-muted">Memuat daftar email Excel...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="btn-send-email">
+              <i class="bi bi-send me-1"></i> Kirim Report ke Email Terpilih
+            </button>
+          </form>
+
+          <!-- Email Status Log -->
+          <div class="mt-3 d-none" id="email-log-container">
+            <div class="log-terminal" id="email-log-terminal"></div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let loadedEmailList = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchEmailList();
+    toggleGeminiKey();
+  });
+
+  function toggleGeminiKey() {
+    const opt = document.querySelector('input[name="slide_option"]:checked').value;
+    const container = document.getElementById('gemini-key-container');
+    if (opt === '1' || opt === '4') {
+      container.classList.remove('d-none');
+    } else {
+      container.classList.add('d-none');
+    }
+  }
+
+  function submitUploadFile() {
+    const fileInput = document.getElementById('csv_file');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('source_type', 'file');
+    formData.append('csv_file', fileInput.files[0]);
+
+    doUpload(formData);
+  }
+
+  function submitUploadUrl(e) {
+    e.preventDefault();
+    const url = document.getElementById('github_url').value.trim();
+    if (!url) return;
+
+    const formData = new FormData();
+    formData.append('source_type', 'url');
+    formData.append('github_url', url);
+
+    doUpload(formData);
+  }
+
+  function doUpload(formData) {
+    fetch('/upload', { method: 'POST', body: formData })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('upload-preview').classList.remove('d-none');
+          document.getElementById('preview-rows').innerText = data.preview.rows;
+          document.getElementById('preview-cols').innerText = data.preview.col_count;
+          document.getElementById('preview-date').innerText = data.preview.date_range || 'N/A';
+          document.getElementById('step1-indicator').classList.add('completed');
+        } else {
+          alert('Error: ' + data.error);
+        }
+      })
+      .catch(err => alert('Upload error: ' + err));
+  }
+
+  function goToStep(step) {
+    document.getElementById(`step${step}-indicator`).classList.add('active');
+    document.getElementById(`step${step}-card`).scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function submitGenerate(e) {
+    e.preventDefault();
+    const form = document.getElementById('generate-form');
+    const formData = new FormData(form);
+
+    const logContainer = document.getElementById('generate-log-container');
+    const terminal = document.getElementById('log-terminal');
+    logContainer.classList.remove('d-none');
+    terminal.innerHTML = '<div>[INFO] Memulai generasi berkas report...</div>';
+
+    fetch('/generate', { method: 'POST', body: formData })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // Stream logs using EventSource (SSE)
+          const evtSource = new EventSource('/progress');
+          evtSource.onmessage = function(e) {
+            if (e.data === '__DONE__') {
+              evtSource.close();
+              terminal.innerHTML += '<div class="text-success">[SUCCESS] Laporan selesai dibuat!</div>';
+              document.getElementById('step2-indicator').classList.add('completed');
+              goToStep(3);
+            } else if (e.data === '__ERROR__') {
+              evtSource.close();
+              terminal.innerHTML += '<div class="text-danger">[ERROR] Terjadi kegagalan proses.</div>';
+            } else {
+              terminal.innerHTML += `<div>${e.data}</div>`;
+              terminal.scrollTop = terminal.scrollHeight;
+            }
+          };
+        } else {
+          alert('Error: ' + data.error);
+        }
+      })
+      .catch(err => alert('Generate request error: ' + err));
+  }
+
+  function renderEmailTable(data) {
+    loadedEmailList = data;
+    const tbody = document.getElementById('email-table-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Tidak ada data email.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    data.forEach((item, idx) => {
+      tbody.innerHTML += `
+        <tr>
+          <td><input type="checkbox" class="email-checkbox" data-idx="${idx}"></td>
+          <td class="font-weight-bold">${item.branch_name}</td>
+          <td><span class="badge bg-secondary me-1">${item.emails.join('</span> <span class="badge bg-secondary me-1">')}</span></td>
+        </tr>
+      `;
+    });
+  }
+
+  function fetchEmailList() {
+    fetch('/email-list')
+      .then(res => res.json())
+      .then(data => renderEmailTable(data));
+  }
+
+  function addManualBranchEmail() {
+    const branchInput = document.getElementById('manual_branch_name');
+    const emailsInput = document.getElementById('manual_emails');
+    const branchName = branchInput.value.trim();
+    const emailsRaw = emailsInput.value.trim();
+
+    if (!branchName) {
+      alert('Nama Branch tidak boleh kosong!');
+      return;
+    }
+    if (!emailsRaw) {
+      alert('Email penerima tidak boleh kosong!');
+      return;
+    }
+
+    const emails = emailsRaw.split(';').map(e => e.trim()).filter(e => e.length > 0);
+    if (!emails.length) {
+      alert('Masukkan format email yang valid!');
+      return;
+    }
+
+    const newItem = { branch_name: branchName, emails: emails };
+    loadedEmailList.unshift(newItem); // Tambahkan ke paling atas
+    renderEmailTable(loadedEmailList);
+
+    // Auto-check items baru yang ditambahkan secara manual
+    const firstCheckbox = document.querySelector('.email-checkbox');
+    if (firstCheckbox) firstCheckbox.checked = true;
+
+    // Reset form
+    branchInput.value = '';
+    emailsInput.value = '';
+    alert(`[SUCCESS] Berhasil menambahkan Branch: '${branchName}' ke daftar penerima!`);
+  }
+
+  function submitUploadCustomEmailExcel(fileInput) {
+    if (!fileInput.files.length) return;
+    const formData = new FormData();
+    formData.append('excel_file', fileInput.files[0]);
+
+    fetch('/upload-email-list', { method: 'POST', body: formData })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert(`[SUCCESS] Berhasil memuat ${data.count} cabang dari Excel kustom!`);
+          renderEmailTable(data.data);
+        } else {
+          alert('Gagal upload Excel list email: ' + data.error);
+        }
+      })
+      .catch(err => alert('Upload Excel error: ' + err));
+  }
+
+  function toggleCheckAll(master) {
+    document.querySelectorAll('.email-checkbox').forEach(cb => cb.checked = master.checked);
+  }
+
+  function submitSendEmail(e) {
+    e.preventDefault();
+    const sender_email = document.getElementById('sender_email').value;
+    const sender_password = document.getElementById('sender_password').value;
+
+    const selected = [];
+    document.querySelectorAll('.email-checkbox:checked').forEach(cb => {
+      const idx = cb.getAttribute('data-idx');
+      selected.push(loadedEmailList[idx]);
+    });
+
+    if (!selected.length) {
+      alert('Pilih minimal satu penerima cabang!');
+      return;
+    }
+
+    const logContainer = document.getElementById('email-log-container');
+    const terminal = document.getElementById('email-log-terminal');
+    logContainer.classList.remove('d-none');
+    terminal.innerHTML = '<div>[INFO] Memulai proses pengiriman email...</div>';
+
+    fetch('/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender_email, sender_password, selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const evtSource = new EventSource('/progress');
+        evtSource.onmessage = function(e) {
+          if (e.data === '__DONE__') {
+            evtSource.close();
+            terminal.innerHTML += '<div class="text-success">[SUCCESS] Pengiriman email selesai.</div>';
+          } else if (e.data.startsWith('{"__RESULTS__"')) {
+            // Summary payload
+          } else {
+            terminal.innerHTML += `<div>${e.data}</div>`;
+            terminal.scrollTop = terminal.scrollHeight;
+          }
+        };
+      } else {
+        alert('Error: ' + data.error);
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
